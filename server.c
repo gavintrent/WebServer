@@ -38,6 +38,7 @@ void parse_args(int argc, char *argv[], struct server_app *app);
 void handle_request(struct server_app *app, int client_socket);
 void serve_local_file(int client_socket, const char *path);
 void proxy_remote_file(struct server_app *app, int client_socket, const char *path);
+char* decode_file_name(const char *input);
 
 // The main function is provided and no change is needed
 int main(int argc, char *argv[])
@@ -147,6 +148,7 @@ void handle_request(struct server_app *app, int client_socket) {
     // Hint: if the requested path is "/" (root), default to index.html
     char *file_name = strtok(request, " ");
     file_name = strtok(NULL, " ");
+    file_name = decode_file_name(file_name);
     if (file_name == NULL || strcmp(file_name, "/") == 0) {
         file_name = "index.html";
     } else {
@@ -183,7 +185,7 @@ void serve_local_file(int client_socket, const char *path) {
     } else {
         // Determine file extension
         const char *file_extension = strrchr(path, '.');
-        const char *content_type = "application/octet-stream"; // Default to binary
+        const char *content_type = "application/octet-stream"; 
 
         if (file_extension != NULL && isalpha(file_extension[1])) {
             // Map file extensions to content types
@@ -196,17 +198,17 @@ void serve_local_file(int client_socket, const char *path) {
             }
         }
 
-        // Read file content
+        // Obtain content length
         fseek(file, 0, SEEK_END);
-        long file_size = ftell(file);
+        long content_length = ftell(file);
         fseek(file, 0, SEEK_SET);
 
         // Build proper response headers
-        char response_headers[128];
+        char response_headers[256];
         sprintf(response_headers,
                  "HTTP/1.0 200 OK\r\n"
                  "Content-Type: %s\r\n"
-                 "Content-Length: %ld\r\n\r\n", content_type, file_size);
+                 "Content-Length: %ld\r\n\r\n", content_type, content_length);
         send(client_socket, response_headers, strlen(response_headers), 0);
 
         // Send file content in chunks
@@ -232,4 +234,26 @@ void proxy_remote_file(struct server_app *app, int client_socket, const char *re
 
     char response[] = "HTTP/1.0 501 Not Implemented\r\n\r\n";
     send(client_socket, response, strlen(response), 0);
+}
+
+char* decode_file_name(const char *url) {
+    char *filename = malloc(strlen(url) + 1);
+    int i = 0, j = 0;
+
+    while (url[i]) {
+        if (url[i] == '%' && isxdigit(url[i + 1]) && isxdigit(url[i + 2])) {
+            sscanf(url + i + 1, "%2hhx", &filename[j]);
+            i += 2;
+        } else if (url[i] == '+') {
+            filename[j] = ' ';
+        } else {
+            filename[j] = url[i];
+        }
+
+        i++;
+        j++;
+    }
+
+    filename[j] = '\0';
+    return filename;
 }
