@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -176,10 +177,25 @@ void serve_local_file(int client_socket, const char *path) {
     FILE *file = fopen(path, "rb");
 
     if (file == NULL) {
-        // If the file doesn't exist, generate a correct response
+        // If the file doesn't exist, generate a not found response
         char not_found_response[] = "HTTP/1.0 404 Not Found\r\n\r\n";
         send(client_socket, not_found_response, strlen(not_found_response), 0);
     } else {
+        // Determine file extension
+        const char *file_extension = strrchr(path, '.');
+        const char *content_type = "application/octet-stream"; // Default to binary
+
+        if (file_extension != NULL && isalpha(file_extension[1])) {
+            // Map file extensions to content types
+            if (strcmp(file_extension, ".html") == 0) {
+                content_type = "text/html";
+            } else if (strcmp(file_extension, ".txt") == 0) {
+                content_type = "text/plain";
+            } else if (strcmp(file_extension, ".jpg") == 0) {
+                content_type = "image/jpeg";
+            }
+        }
+
         // Read file content
         fseek(file, 0, SEEK_END);
         long file_size = ftell(file);
@@ -187,10 +203,10 @@ void serve_local_file(int client_socket, const char *path) {
 
         // Build proper response headers
         char response_headers[128];
-        snprintf(response_headers, sizeof(response_headers), 
+        sprintf(response_headers,
                  "HTTP/1.0 200 OK\r\n"
-                 "Content-Type: text/html\r\n"
-                 "Content-Length: %ld\r\n\r\n", file_size);
+                 "Content-Type: %s\r\n"
+                 "Content-Length: %ld\r\n\r\n", content_type, file_size);
         send(client_socket, response_headers, strlen(response_headers), 0);
 
         // Send file content in chunks
