@@ -211,13 +211,13 @@ void serve_local_file(int client_socket, const char *path) {
         fclose(file);
 
         // Build proper response headers
-        char response_headers[128 + content_length];
-        sprintf(response_headers,
+        char response[128 + content_length];
+        sprintf(response,
                  "HTTP/1.0 200 OK\r\n"
                  "Content-Type: %s\r\n"
                  "Content-Length: %ld\r\n\r\n"
                  "%s", content_type, content_length, file_content);
-        send(client_socket, response_headers, strlen(response_headers), 0);
+        send(client_socket, response, strlen(response), 0);
 
         free(file_content);
     }
