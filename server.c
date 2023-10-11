@@ -245,8 +245,6 @@ char* decode_file_name(const char *url) {
         if (url[i] == '%' && isxdigit(url[i + 1]) && isxdigit(url[i + 2])) {
             sscanf(url + i + 1, "%2hhx", &filename[j]);
             i += 2;
-        } else if (url[i] == '+') {
-            filename[j] = ' ';
         } else {
             filename[j] = url[i];
         }
@@ -255,5 +253,6 @@ char* decode_file_name(const char *url) {
         j++;
     }
 
+    filename[j] = '\0';
     return filename;
 }
