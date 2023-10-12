@@ -36,7 +36,7 @@ void parse_args(int argc, char *argv[], struct server_app *app);
 
 // The following functions need to be updated
 void handle_request(struct server_app *app, int client_socket);
-void serve_local_file(int client_socket, const char *path);
+void serve_local_file(int client_socket, const char *path, const char *file_extension);
 void proxy_remote_file(struct server_app *app, int client_socket, const char *path);
 char* decode_file_name(const char *input);
 
@@ -155,16 +155,20 @@ void handle_request(struct server_app *app, int client_socket) {
         file_name++;
     }
 
+    // Determine file extension
+    const char *file_extension = strrchr(file_name, '.');
+
     // TODO: Implement proxy and call the function under condition
     // specified in the spec
-    // if (need_proxy(...)) {
-    //    proxy_remote_file(app, client_socket, file_name);
-    // } else {
-    serve_local_file(client_socket, file_name);
-    //}
+    if (file_extension != NULL && isalpha(file_extension[1]) && strcmp(file_extension, ".ts") == 0) {
+        struct server_app *app;
+        proxy_remote_file(app, client_socket, file_name);
+    } else {
+    serve_local_file(client_socket, file_name, file_extension);
+    }
 }
 
-void serve_local_file(int client_socket, const char *path) {
+void serve_local_file(int client_socket, const char *path, const char *file_extension) {
     // TODO: Properly implement serving of local files
     // The following code returns a dummy response for all requests
     // but it should give you a rough idea about what a proper response looks like
@@ -183,8 +187,6 @@ void serve_local_file(int client_socket, const char *path) {
         char not_found_response[] = "HTTP/1.0 404 Not Found\r\n\r\n";
         send(client_socket, not_found_response, strlen(not_found_response), 0);
     } else {
-        // Determine file extension
-        const char *file_extension = strrchr(path, '.');
         const char *content_type = "application/octet-stream"; 
 
         if (file_extension != NULL && isalpha(file_extension[1])) {
