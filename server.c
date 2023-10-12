@@ -204,20 +204,25 @@ void serve_local_file(int client_socket, const char *path) {
         fseek(file, 0, SEEK_SET);
 
         // Allocate memory for the file content
-        char *file_content = malloc(content_length + 1);
+        char *file_content = malloc(content_length);
 
         // Obtain file content
         fread(file_content, 1, content_length, file);
         fclose(file);
 
-        // Build proper response headers
-        char response[128 + content_length];
-        sprintf(response,
-                 "HTTP/1.0 200 OK\r\n"
-                 "Content-Type: %s\r\n"
-                 "Content-Length: %ld\r\n\r\n"
-                 "%s", content_type, content_length, file_content);
-        send(client_socket, response, strlen(response), 0);
+        // Build response headers
+        char response_headers[128];
+        sprintf(response_headers,
+                "HTTP/1.0 200 OK\r\n"
+                "Content-Type: %s\r\n"
+                "Content-Length: %ld\r\n\r\n",
+                content_type, content_length);
+
+        // Send response headers
+        send(client_socket, response_headers, strlen(response_headers), 0);
+
+        // Send file content
+        send(client_socket, file_content, content_length, 0);
 
         free(file_content);
     }
