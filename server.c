@@ -161,8 +161,7 @@ void handle_request(struct server_app *app, int client_socket) {
     // TODO: Implement proxy and call the function under condition
     // specified in the spec
     if (file_extension != NULL && isalpha(file_extension[1]) && strcmp(file_extension, ".ts") == 0) {
-        struct server_app *app;
-        proxy_remote_file(app, client_socket, file_name);
+        proxy_remote_file(app, client_socket, buffer);
     } else {
     serve_local_file(client_socket, file_name, file_extension);
     }
@@ -240,8 +239,49 @@ void proxy_remote_file(struct server_app *app, int client_socket, const char *re
     // * When connection to the remote server fail, properly generate
     // HTTP 502 "Bad Gateway" response
 
-    char response[] = "HTTP/1.0 501 Not Implemented\r\n\r\n";
-    send(client_socket, response, strlen(response), 0);
+    // set up new socket between server and remote
+    int dest_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (dest_socket == -1) {
+        perror("Socket failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // initialize address details
+    struct sockaddr_in dest_addr;
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_port = htons(app->remote_port);
+    dest_addr.sin_addr.s_addr = inet_addr(app->remote_host);
+    memset(dest_addr.sin_zero, '\0', sizeof(dest_addr.sin_zero));
+
+    // connect to remote server
+    if (connect(dest_socket, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) == -1) {
+        perror("socket connection failed");
+        char response[] = "HTTP/1.0 502 Bad Gateway\r\n\r\n";
+        send(client_socket, response, strlen(response), 0);
+        exit(EXIT_FAILURE);
+    }
+
+    // forward client request
+    if (send(dest_socket, request, strlen(request), 0) == -1) {
+        printf("error forwarding client request");
+        exit(EXIT_FAILURE);
+    }
+
+    // prepare buffer for response
+    char buffer[BUFFER_SIZE];
+    bzero(buffer, BUFFER_SIZE);
+    int bytes_received;
+
+    // forward incoming bytes to client
+    while ((bytes_received = read(dest_socket, buffer, BUFFER_SIZE)) != 0) {
+        if (send(client_socket, buffer, bytes_received, 0) == -1)
+            perror("error forwarding remote response");
+        bzero(buffer, BUFFER_SIZE);
+    }
+    
+    if (bytes_received < 0) {
+        perror("unable to read from remote server");
+    }
 }
 
 char* decode_file_name(const char *url) {
